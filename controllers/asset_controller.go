@@ -26,13 +26,12 @@ func NewAssetController(assetService services.AssetService) *AssetController {
 // @Success 201 {object} models.Asset
 // @Router /assets [post]
 func (c *AssetController) CreateAsset(ctx *gin.Context) {
-	userRole, exists := ctx.Get("role")
+	roleVal, exists := ctx.Get("role")
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
 		return
 	}
-
-	role := userRole.(models.Role)
+	role := roleVal.(models.Role)
 
 	allowedRoles := []models.Role{
 		models.RoleAdmin,
@@ -61,14 +60,24 @@ func (c *AssetController) CreateAsset(ctx *gin.Context) {
 		return
 	}
 
-	// PARSE tanggal manual
+	// Validasi serial number tidak boleh kosong
+	if input.SerialNumber == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "serial_number is required"})
+		return
+	}
+
 	purchaseDate, err := time.Parse("2006-01-02", input.PurchaseDate)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "purchase_date must be in format YYYY-MM-DD"})
 		return
 	}
 
-	userID := ctx.MustGet("userID").(uint)
+	userIDVal, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "user_id information not found"})
+		return
+	}
+	userID := userIDVal.(uint)
 
 	asset := models.Asset{
 		Name:         input.Name,
@@ -77,6 +86,7 @@ func (c *AssetController) CreateAsset(ctx *gin.Context) {
 		Location:     input.Location,
 		Status:       models.AssetStatus(input.Status),
 		CreatedBy:    userID,
+		SerialNumber: input.SerialNumber,
 	}
 
 	newAsset, err := c.assetService.CreateAsset(userID, asset)
@@ -97,9 +107,14 @@ func (c *AssetController) CreateAsset(ctx *gin.Context) {
 // @Success 200 {array} models.Asset
 // @Router /assets [get]
 func (c *AssetController) GetAllAssets(ctx *gin.Context) {
-	userRole := models.Role(ctx.GetString("role"))
+	roleVal, exists := ctx.Get("role")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
+		return
+	}
+	role := roleVal.(models.Role)
 
-	assets, err := c.assetService.GetAllAssets(userRole)
+	assets, err := c.assetService.GetAllAssets(role)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -115,14 +130,20 @@ func (c *AssetController) GetAllAssets(ctx *gin.Context) {
 // @Success 200 {object} models.Asset
 // @Router /assets/{id} [get]
 func (c *AssetController) GetAssetByID(ctx *gin.Context) {
-	userRole := models.Role(ctx.GetString("role"))
+	roleVal, exists := ctx.Get("role")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
+		return
+	}
+	role := roleVal.(models.Role)
+
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset ID"})
 		return
 	}
 
-	asset, err := c.assetService.GetAssetByID(userRole, uint(id))
+	asset, err := c.assetService.GetAssetByID(role, uint(id))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "asset not found"})
 		return
@@ -139,8 +160,20 @@ func (c *AssetController) GetAssetByID(ctx *gin.Context) {
 // @Success 200 {object} models.Asset
 // @Router /assets/{id} [put]
 func (c *AssetController) UpdateAsset(ctx *gin.Context) {
-	userID := ctx.GetUint("userID")
-	userRole := models.Role(ctx.GetString("role"))
+	userIDVal, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "user_id information not found"})
+		return
+	}
+	userID := userIDVal.(uint)
+
+	roleVal, exists := ctx.Get("role")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
+		return
+	}
+	role := roleVal.(models.Role)
+
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset ID"})
@@ -153,7 +186,7 @@ func (c *AssetController) UpdateAsset(ctx *gin.Context) {
 		return
 	}
 
-	asset, err := c.assetService.UpdateAsset(userID, userRole, uint(id), updates)
+	asset, err := c.assetService.UpdateAsset(userID, role, uint(id), updates)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -169,14 +202,20 @@ func (c *AssetController) UpdateAsset(ctx *gin.Context) {
 // @Success 204
 // @Router /assets/{id} [delete]
 func (c *AssetController) DeleteAsset(ctx *gin.Context) {
-	userRole := models.Role(ctx.GetString("role"))
+	roleVal, exists := ctx.Get("role")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
+		return
+	}
+	role := roleVal.(models.Role)
+
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset ID"})
 		return
 	}
 
-	if err := c.assetService.DeleteAsset(userRole, uint(id)); err != nil {
+	if err := c.assetService.DeleteAsset(role, uint(id)); err != nil {
 		ctx.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}

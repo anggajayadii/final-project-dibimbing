@@ -6,4 +6,5 @@ type CreateAssetInput struct {
 	PurchaseDate string `json:"purchase_date" binding:"required"`
 	Location     string `json:"location" binding:"required"`
 	Status       string `json:"status" binding:"required"`
+	SerialNumber string `json:"serial_number" binding:"required"`
 }

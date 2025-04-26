@@ -1,7 +1,5 @@
-# ====================================
 # Stage 1: Build
-# ====================================
-FROM golang:1.23 AS builder
+FROM golang:1.23.4 AS builder
 
 WORKDIR /app
 
@@ -10,22 +8,23 @@ RUN go mod download
 
 COPY . .
 
-# build static binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o asset-management
+RUN CGO_ENABLED=0 GOOS=linux go build -o main
 
-# ====================================
 # Stage 2: Run
-# ====================================
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-COPY --from=builder /app/asset-management .
+# Copy executable
+COPY --from=builder /app/main .
+
+# Copy .env file
+COPY --from=builder /app/.env .
 
 ENV GIN_MODE=release
 
 EXPOSE 8080
 
-CMD ["./asset-management"]
+CMD ["./main"]

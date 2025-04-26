@@ -5,40 +5,46 @@ import (
 	"asset-management/models"
 	"asset-management/routes"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found, relying on environment variables")
 	}
 
-	// Menghubungkan ke database
+	// Connect to database
 	config.ConnectDatabase()
 
-	config.DB.AutoMigrate(
+	// Auto migrate tables
+	if err := config.DB.AutoMigrate(
 		&models.User{},
 		&models.Asset{},
 		&models.Maintenance{},
 		&models.AssetLog{},
-	)
-
-	// Auto migrate di main.go
-	if err := config.DB.AutoMigrate(&models.User{}); err != nil {
+	); err != nil {
 		log.Fatal("Migration failed: ", err)
 	}
 
-	// Initialize JWT configuration
+	// Initialize JWT
 	config.InitJWTConfig()
 
+	// Setup router
 	router := gin.Default()
 	routes.SetupRoutes(router)
 
-	// Menjalankan server di port 8080
-	if err := router.Run(":8080"); err != nil {
+	// Get port from env
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	// Start server
+	if err := router.Run(":" + port); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
 }
